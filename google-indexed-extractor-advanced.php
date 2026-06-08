@@ -1,9 +1,9 @@
 <?php
 /**
- * SCRIPT: ADVANCED GOOGLE INDEXED URLS EXTRACTOR v2.0
- * Fungsi: Extract direktori/path terindex di Google TANPA HARUS SITEMAP
+ * SCRIPT: PROFESSIONAL GOOGLE INDEXED URLS EXTRACTOR v3.0
+ * Fungsi: Extract direktori/path terindex di Google dengan UI Professional
  * Input: URL domain saja
- * Output: Semua direktori terindex dengan berbagai metode fallback
+ * Output: Semua direktori terindex dengan interface premium
  * 
  * METODE EKSTRAKSI:
  * 1. Sitemap.xml (jika ada)
@@ -11,7 +11,7 @@
  * 3. robots.txt parsing
  * 4. Common directories scanning
  * 5. Meta links extraction dari halaman
- * 6. DNS & subdomain enumeration
+ * 6. Web crawling otomatis
  */
 
 @ini_set('display_errors', 1);
@@ -64,13 +64,11 @@ function extractFromSitemap($domain) {
     foreach ($sitemapUrls as $sitemapUrl) {
         $content = @file_get_contents($sitemapUrl, false, $context);
         if ($content && strpos($content, '<') !== false) {
-            // Extract loc tags
             preg_match_all('#<loc>([^<]+)</loc>#i', $content, $matches);
             if (!empty($matches[1])) {
                 $urls = array_merge($urls, $matches[1]);
             }
             
-            // Jika ini sitemap index, extract sitemap references
             preg_match_all('#<sitemap>.*?<loc>([^<]+)</loc>.*?</sitemap>#is', $content, $submaps);
             if (!empty($submaps[1])) {
                 foreach ($submaps[1] as $submap) {
@@ -102,7 +100,6 @@ function extractFromPageLinks($domain) {
         return $urls;
     }
     
-    // Extract semua href links
     preg_match_all('#href=["\']([^"\']+)["\']#i', $html, $matches);
     if (!empty($matches[1])) {
         foreach ($matches[1] as $link) {
@@ -111,19 +108,16 @@ function extractFromPageLinks($domain) {
                 continue;
             }
             
-            // Convert relative URLs to absolute
             if (strpos($link, 'http') !== 0 && strpos($link, '//') !== 0) {
                 $link = rtrim($domain, '/') . '/' . ltrim($link, '/');
             }
             
-            // Filter hanya URLs dari domain yang sama
             if (strpos($link, $domain) === 0) {
                 $urls[] = $link;
             }
         }
     }
     
-    // Extract dari canonical, og:url, dll
     preg_match_all('#(?:canonical|og:url|twitter:url|content)["\']?\s*(?:href=|content=)?["\']([^"\'<>]+)["\']#i', $html, $metamatches);
     if (!empty($metamatches[1])) {
         foreach ($metamatches[1] as $url) {
@@ -137,7 +131,7 @@ function extractFromPageLinks($domain) {
 }
 
 // ==========================================
-// FUNCTION: Crawl website untuk extract URLs
+// FUNCTION: Crawl website
 // ==========================================
 function crawlWebsite($domain, $maxPages = 10) {
     $domain = rtrim($domain, '/');
@@ -163,7 +157,6 @@ function crawlWebsite($domain, $maxPages = 10) {
         
         $urls[] = $currentUrl;
         
-        // Extract links dari halaman
         preg_match_all('#href=["\']([^"\']+)["\']#i', $html, $matches);
         if (!empty($matches[1])) {
             foreach ($matches[1] as $link) {
@@ -172,19 +165,16 @@ function crawlWebsite($domain, $maxPages = 10) {
                     continue;
                 }
                 
-                // Normalize URL
                 if (strpos($link, 'http') !== 0 && strpos($link, '//') !== 0) {
                     $link = rtrim($domain, '/') . '/' . ltrim($link, '/');
                 }
                 
-                // Parse URL untuk remove query strings & fragments
                 $parsed = parse_url($link);
                 $clean_url = $parsed['scheme'] . '://' . $parsed['host'] . ($parsed['path'] ?? '/');
                 if (isset($parsed['query'])) {
                     $clean_url .= '?' . $parsed['query'];
                 }
                 
-                // Filter hanya URLs dari domain yang sama
                 if (strpos($clean_url, $domain) === 0 && !in_array($clean_url, $visited)) {
                     $toVisit[] = $clean_url;
                 }
@@ -192,14 +182,14 @@ function crawlWebsite($domain, $maxPages = 10) {
         }
         
         $count++;
-        usleep(500000); // 500ms delay
+        usleep(500000);
     }
     
     return array_unique($urls);
 }
 
 // ==========================================
-// FUNCTION: Extract dari Common Directories
+// FUNCTION: Check Common Directories
 // ==========================================
 function checkCommonDirectories($domain) {
     $domain = rtrim($domain, '/');
@@ -247,7 +237,6 @@ function extractFromRobotsTxt($domain) {
     
     $robotsContent = @file_get_contents($domain . '/robots.txt', false, $context);
     if ($robotsContent) {
-        // Extract Sitemap URLs
         preg_match_all('#Sitemap:\s*(.+)#i', $robotsContent, $matches);
         if (!empty($matches[1])) {
             foreach ($matches[1] as $sitemapUrl) {
@@ -255,7 +244,6 @@ function extractFromRobotsTxt($domain) {
             }
         }
         
-        // Extract Disallow paths (potential directories)
         preg_match_all('#Disallow:\s*(/[^\s]*)#i', $robotsContent, $disallows);
         if (!empty($disallows[1])) {
             foreach ($disallows[1] as $path) {
@@ -263,7 +251,6 @@ function extractFromRobotsTxt($domain) {
             }
         }
         
-        // Extract Allow paths
         preg_match_all('#Allow:\s*(/[^\s]*)#i', $robotsContent, $allows);
         if (!empty($allows[1])) {
             foreach ($allows[1] as $path) {
@@ -276,33 +263,7 @@ function extractFromRobotsTxt($domain) {
 }
 
 // ==========================================
-// FUNCTION: Query Google Cache (simulation)
-// ==========================================
-function extractFromGoogleCache($domain) {
-    $domain = rtrim(preg_replace(['#^https?://#', '#/$#'], '', $domain), '/');
-    $context = createHttpContext();
-    $urls = [];
-    
-    // Try accessing Google Cache
-    $cacheUrl = 'http://webcache.googleusercontent.com/cache:' . $domain . '/';
-    $content = @file_get_contents($cacheUrl, false, $context);
-    
-    if ($content) {
-        preg_match_all('#href=["\']([^"\']+)["\']#i', $content, $matches);
-        if (!empty($matches[1])) {
-            foreach ($matches[1] as $url) {
-                if (strpos($url, $domain) !== false) {
-                    $urls[] = $url;
-                }
-            }
-        }
-    }
-    
-    return $urls;
-}
-
-// ==========================================
-// FUNCTION: Extract Directories dari URLs
+// FUNCTION: Extract Directories
 // ==========================================
 function extractDirectories($urls, $domain) {
     $domain = rtrim(preg_replace(['#^https?://#', '#/$#'], '', $domain), '/');
@@ -323,12 +284,10 @@ function extractDirectories($urls, $domain) {
         
         if (empty($path)) continue;
         
-        // Analyze path depth
         $pathParts = explode('/', $path);
         $depth = count(array_filter($pathParts));
         $stats['max_depth'] = max($stats['max_depth'], $depth);
         
-        // Extract directories
         for ($i = 0; $i < count($pathParts) - 1; $i++) {
             $dir = implode('/', array_slice($pathParts, 0, $i + 1));
             if (!empty($dir) && !in_array($dir, $directories)) {
@@ -336,7 +295,6 @@ function extractDirectories($urls, $domain) {
             }
         }
         
-        // Add full path if not a file
         $lastPart = end($pathParts);
         if (!preg_match('/\.(php|html|htm|aspx|jsp|pdf|jpg|png|gif|css|js)$/i', $lastPart)) {
             if (!in_array($path, $directories)) {
@@ -348,7 +306,6 @@ function extractDirectories($urls, $domain) {
     sort($directories);
     $stats['unique_dirs'] = count($directories);
     
-    // Categorize directories
     foreach ($directories as $dir) {
         if (preg_match('/(blog|news|article|post)/i', $dir)) {
             $stats['categories'][] = ['type' => 'Blog/Content', 'dir' => $dir];
@@ -364,358 +321,777 @@ function extractDirectories($urls, $domain) {
 
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Google Indexed Extractor v2.0</title>
+    <title>Professional Google Indexed Extractor v3.0</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .container {
-            max-width: 1200px;
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #764ba2;
+            --secondary: #f093fb;
+            --success: #4CAF50;
+            --warning: #ff9800;
+            --danger: #f44336;
+            --info: #2196F3;
+            --light: #f5f7fa;
+            --dark: #2c3e50;
+            --border: #e0e6ed;
+            --text: #3a4451;
+            --text-light: #7a8fa0;
+        }
+
+        html, body {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .wrapper {
+            max-width: 1400px;
             margin: 0 auto;
+        }
+
+        /* HEADER */
+        .header-premium {
             background: white;
             border-radius: 15px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 50px 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
             overflow: hidden;
         }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
+
+        .header-premium::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
         }
-        .header h1 { font-size: 32px; margin-bottom: 10px; }
-        .header p { opacity: 0.95; font-size: 15px; margin-bottom: 15px; }
-        .badge { 
-            display: inline-block; 
-            background: rgba(255,255,255,0.3); 
-            padding: 5px 12px; 
-            border-radius: 20px; 
-            font-size: 12px; 
-            font-weight: 600;
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 30px;
         }
-        .content { padding: 40px 30px; }
-        .form-group {
-            margin-bottom: 25px;
-        }
-        label {
-            display: block;
+
+        .header-text h1 {
+            font-size: 36px;
+            color: var(--dark);
+            margin-bottom: 8px;
             font-weight: 700;
-            margin-bottom: 10px;
-            color: #333;
+        }
+
+        .header-text p {
+            color: var(--text-light);
             font-size: 15px;
+            line-height: 1.6;
         }
-        input[type="text"], input[type="url"], select {
-            width: 100%;
-            padding: 14px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s;
-            font-family: inherit;
-        }
-        input[type="text"]:focus, input[type="url"]:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        .methods-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 12px;
-            margin-bottom: 25px;
-        }
-        .method-card {
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: #fafafa;
-        }
-        .method-card:hover {
-            border-color: #667eea;
-            background: #f0f4ff;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-        }
-        .method-card input {
-            margin-right: 10px;
-            cursor: pointer;
-        }
-        .method-card label {
-            margin: 0;
-            cursor: pointer;
+
+        .header-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 13px;
             font-weight: 600;
+            margin-top: 15px;
+            width: fit-content;
+        }
+
+        .header-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-mini {
+            text-align: center;
+            padding: 12px;
+            background: var(--light);
+            border-radius: 10px;
+        }
+
+        .stat-mini strong {
+            display: block;
+            font-size: 22px;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .stat-mini span {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        /* MAIN CONTAINER */
+        .container-premium {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1024px) {
+            .container-premium {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* CARD */
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 25px;
             display: flex;
             align-items: center;
+            gap: 12px;
         }
-        .method-info {
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 2px;
+        }
+
+        /* FORM */
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--dark);
+            font-size: 14px;
+        }
+
+        .form-group input[type="url"],
+        .form-group select {
+            width: 100%;
+            padding: 13px 16px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            color: var(--text);
+        }
+
+        .form-group input[type="url"]:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 6px;
+            color: var(--text-light);
             font-size: 12px;
-            color: #666;
-            margin-top: 8px;
-            margin-left: 24px;
         }
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+        /* CHECKBOX GRID */
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .checkbox-item {
+            position: relative;
+            padding: 14px;
+            background: var(--light);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .checkbox-item:hover {
+            border-color: var(--primary);
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .checkbox-item input[type="checkbox"]:checked + label {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .checkbox-item input[type="checkbox"]:checked ~ .checkmark {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .checkbox-item input[type="checkbox"]:checked ~ .checkmark::after {
+            display: block;
+        }
+
+        .checkmark {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            height: 18px;
+            width: 18px;
+            background-color: white;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .checkmark::after {
+            content: '';
+            position: absolute;
+            display: none;
+            left: 4px;
+            top: 1px;
+            width: 6px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .checkbox-item label {
+            margin-left: 30px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .checkbox-item label strong {
+            display: block;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .checkbox-item label span {
+            font-size: 11px;
+            color: var(--text-light);
+        }
+
+        /* BUTTON */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white;
-            padding: 16px 40px;
+            padding: 16px 32px;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
+            border-radius: 10px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
             width: 100%;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
         }
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
         }
-        button:active {
-            transform: translateY(0);
+
+        .btn-primary:active {
+            transform: translateY(-1px);
         }
-        .result-section {
-            margin-top: 30px;
-            padding: 25px;
-            background: #f8f9fa;
+
+        /* INFO BOX */
+        .info-box {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(240, 147, 251, 0.1) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.2);
             border-radius: 10px;
-            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin-bottom: 25px;
         }
-        .result-section h3 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 18px;
+
+        .info-box strong {
+            color: var(--primary);
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .info-box ul {
+            list-style: none;
+        }
+
+        .info-box li {
+            font-size: 13px;
+            color: var(--text);
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .info-box li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        /* RESULT SECTION */
+        .results-container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            margin-top: 30px;
+        }
+
+        .result-header {
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border);
         }
-        textarea {
-            width: 100%;
-            height: 220px;
-            padding: 14px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
+
+        .result-header h2 {
+            font-size: 24px;
+            color: var(--dark);
+        }
+
+        .result-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success);
+            border-radius: 20px;
             font-size: 13px;
-            resize: vertical;
-            background: white;
+            font-weight: 600;
         }
+
+        .result-status.loading {
+            background: rgba(33, 150, 243, 0.1);
+            color: var(--info);
+        }
+
+        .result-status.error {
+            background: rgba(244, 67, 54, 0.1);
+            color: var(--danger);
+        }
+
+        /* STATS GRID */
         .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--light) 0%, white 100%);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card strong {
+            display: block;
+            font-size: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .stat-card span {
+            font-size: 13px;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+
+        /* METHODS GRID */
+        .methods-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 15px;
-            margin-bottom: 25px;
+            margin-bottom: 40px;
         }
-        .stat-box {
-            background: white;
+
+        .method-badge {
+            background: linear-gradient(135deg, var(--light) 0%, white 100%);
             padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-radius: 12px;
+            border: 1px solid var(--border);
             text-align: center;
+            transition: all 0.3s ease;
         }
-        .stat-box strong {
+
+        .method-badge:hover {
+            border-color: var(--primary);
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .method-badge strong {
             display: block;
-            font-size: 28px;
-            color: #667eea;
-            margin-bottom: 8px;
-        }
-        .stat-box span {
-            font-size: 13px;
-            color: #666;
-            font-weight: 500;
-        }
-        .alert {
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 18px;
-            border-left: 4px solid;
+            color: var(--dark);
+            margin-bottom: 5px;
             font-size: 14px;
         }
+
+        .method-badge .count {
+            font-size: 24px;
+            color: var(--primary);
+            font-weight: 700;
+            margin: 8px 0;
+        }
+
+        .method-badge span {
+            font-size: 11px;
+            color: var(--text-light);
+        }
+
+        /* ALERT */
+        .alert {
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+
         .alert-info {
-            background: #e3f2fd;
-            border-color: #2196F3;
-            color: #1565c0;
+            background: rgba(33, 150, 243, 0.1);
+            border-color: var(--info);
+            color: #0d47a1;
         }
+
         .alert-success {
-            background: #e8f5e9;
-            border-color: #4CAF50;
-            color: #2e7d32;
+            background: rgba(76, 175, 80, 0.1);
+            border-color: var(--success);
+            color: #1b5e20;
         }
+
         .alert-warning {
-            background: #fff3e0;
-            border-color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+            border-color: var(--warning);
             color: #e65100;
         }
+
         .alert-danger {
-            background: #ffebee;
-            border-color: #f44336;
-            color: #c62828;
+            background: rgba(244, 67, 54, 0.1);
+            border-color: var(--danger);
+            color: #b71c1c;
         }
+
+        .alert::before {
+            font-size: 18px;
+        }
+
+        /* TABS */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-light);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-btn:hover {
+            color: var(--dark);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* TEXTAREA */
+        .code-block {
+            background: #f5f7fa;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .code-block-header {
+            background: var(--light);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-block-content {
+            padding: 16px;
+        }
+
+        .code-block textarea {
+            width: 100%;
+            height: 250px;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: transparent;
+            resize: vertical;
+            color: var(--text);
+        }
+
+        .code-block textarea:focus {
+            outline: none;
+        }
+
+        .copy-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        /* BUTTON GROUP */
         .button-group {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 12px;
-            margin-top: 18px;
+            margin-top: 25px;
         }
-        .button-group button {
+
+        .btn-export {
+            background: var(--success);
+            color: white;
+            border: none;
             padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
             font-size: 13px;
-            background: #28a745;
-        }
-        .button-group button:hover {
-            background: #218838;
-        }
-        .method-sources {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-            margin-bottom: 25px;
-        }
-        .source-item {
-            background: white;
-            padding: 12px;
-            border-radius: 6px;
-            border: 1px solid #e0e0e0;
-            font-size: 13px;
-        }
-        .source-item strong {
-            color: #667eea;
-            display: block;
-            margin-bottom: 5px;
-        }
-        .source-item .count {
-            color: #666;
             font-weight: 600;
+            transition: all 0.3s ease;
         }
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 20px;
+
+        .btn-export:hover {
+            background: #45a049;
+            transform: translateY(-2px);
         }
+
+        /* LOADING */
         .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+            border: 3px solid rgba(102, 126, 234, 0.1);
+            border-top: 3px solid var(--primary);
             border-radius: 50%;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+            margin: 0 auto 15px;
         }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .info-box {
-            background: #f0f4ff;
-            padding: 18px;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-            margin-bottom: 20px;
+
+        .loading-container {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading-container p {
+            color: var(--text-light);
+            margin-top: 10px;
+        }
+
+        /* FOOTER */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.7);
             font-size: 13px;
-            line-height: 1.6;
-        }
-        .info-box ul {
-            list-style: none;
-            margin-left: 0;
-        }
-        .info-box li {
-            margin-bottom: 8px;
-        }
-        .info-box li:before {
-            content: "✓ ";
-            color: #667eea;
-            font-weight: bold;
-            margin-right: 8px;
+            margin-top: 40px;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <h1>🔍 Advanced Google Indexed Extractor</h1>
-        <p>Extract SEMUA direktori terindex di Google tanpa perlu Sitemap</p>
-        <span class="badge">✨ Multiple Methods • Multi-Source • No Sitemap Required</span>
-    </div>
-    
-    <div class="content">
-        <form method="POST">
-            <div class="form-group">
-                <label for="domain">🌐 Masukan URL Domain:</label>
-                <input type="url" id="domain" name="domain" placeholder="https://example.com" required value="<?php echo isset($_POST['domain']) ? htmlspecialchars($_POST['domain']) : ''; ?>">
-                <small style="color: #999; display: block; margin-top: 6px;">Format: https://example.com (dengan protokol)</small>
-            </div>
-            
-            <div class="form-group">
-                <label>📌 Pilih Metode Ekstraksi:</label>
-                <div class="methods-grid">
-                    <label class="method-card">
-                        <input type="checkbox" name="methods[]" value="sitemap" checked>
-                        <div>
-                            <strong>Sitemap.xml</strong>
-                            <div class="method-info">Extract dari sitemap.xml (paling akurat)</div>
-                        </div>
-                    </label>
-                    <label class="method-card">
-                        <input type="checkbox" name="methods[]" value="crawl" checked>
-                        <div>
-                            <strong>Web Crawling</strong>
-                            <div class="method-info">Scan langsung website untuk menemukan URLs</div>
-                        </div>
-                    </label>
-                    <label class="method-card">
-                        <input type="checkbox" name="methods[]" value="robots" checked>
-                        <div>
-                            <strong>Robots.txt</strong>
-                            <div class="method-info">Parse robots.txt untuk paths & sitemaps</div>
-                        </div>
-                    </label>
-                    <label class="method-card">
-                        <input type="checkbox" name="methods[]" value="common" checked>
-                        <div>
-                            <strong>Common Dirs</strong>
-                            <div class="method-info">Check direktori umum yang sering ada</div>
-                        </div>
-                    </label>
-                    <label class="method-card">
-                        <input type="checkbox" name="methods[]" value="googlecache">
-                        <div>
-                            <strong>Google Cache</strong>
-                            <div class="method-info">Extract dari Google Cache (jika tersedia)</div>
-                        </div>
-                    </label>
-                    <label class="method-card">
-                        <input type="checkbox" name="methods[]" value="pagelinks">
-                        <div>
-                            <strong>Page Links</strong>
-                            <div class="method-info">Extract semua links dari halaman utama</div>
-                        </div>
-                    </label>
+<div class="wrapper">
+    <!-- HEADER -->
+    <div class="header-premium">
+        <div class="header-content">
+            <div class="header-text">
+                <h1>🔍 Professional Indexed Extractor</h1>
+                <p>Extract semua direktori terindex di Google dengan teknologi multi-method canggih</p>
+                <div class="header-badge">
+                    ✨ 6 Methods • Multi-Source • Real-Time Analysis
                 </div>
             </div>
-            
-            <div class="info-box">
-                <strong style="color: #667eea;">💡 Rekomendasi:</strong>
-                <ul>
-                    <li>Gunakan semua metode untuk hasil maksimal</li>
-                    <li>Web Crawling akan memakan waktu ~10-30 detik</li>
-                    <li>Semakin banyak metode yang digunakan, semakin lengkap hasilnya</li>
-                </ul>
-            </div>
-            
-            <button type="submit" name="extract" value="1">🚀 Mulai Ekstraksi Multi-Method</button>
-        </form>
-        
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="container-premium">
+        <!-- INPUT CARD -->
+        <div class="card">
+            <div class="card-title">📝 Input Domain</div>
+            <form method="POST">
+                <div class="form-group">
+                    <label>🌐 URL Domain</label>
+                    <input type="url" name="domain" placeholder="https://example.com" required value="<?php echo isset($_POST['domain']) ? htmlspecialchars($_POST['domain']) : ''; ?>">
+                    <small>Format: https://example.com (dengan protokol)</small>
+                </div>
+
+                <button type="submit" name="extract" value="1" class="btn-primary">🚀 Mulai Analisis</button>
+            </form>
+        </div>
+
+        <!-- METHODS CARD -->
+        <div class="card">
+            <div class="card-title">⚙️ Metode Ekstraksi</div>
+            <form method="POST">
+                <div class="checkbox-grid">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="sitemap" name="methods[]" value="sitemap" checked>
+                        <div class="checkmark"></div>
+                        <label for="sitemap">
+                            <strong>Sitemap</strong>
+                            <span>Extract dari XML</span>
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="robots" name="methods[]" value="robots" checked>
+                        <div class="checkmark"></div>
+                        <label for="robots">
+                            <strong>Robots.txt</strong>
+                            <span>Parse paths</span>
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="crawl" name="methods[]" value="crawl" checked>
+                        <div class="checkmark"></div>
+                        <label for="crawl">
+                            <strong>Crawling</strong>
+                            <span>Scan website</span>
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="common" name="methods[]" value="common" checked>
+                        <div class="checkmark"></div>
+                        <label for="common">
+                            <strong>Common Dirs</strong>
+                            <span>Check umum</span>
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pagelinks" name="methods[]" value="pagelinks" checked>
+                        <div class="checkmark"></div>
+                        <label for="pagelinks">
+                            <strong>Page Links</strong>
+                            <span>Extract links</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <strong>💡 Rekomendasi</strong>
+                    <ul>
+                        <li>Gunakan semua metode untuk hasil maksimal</li>
+                        <li>Proses analysis ~10-30 detik</li>
+                        <li>Semakin banyak method = hasil lebih lengkap</li>
+                    </ul>
+                </div>
+
+                <button type="submit" name="extract" value="1" class="btn-primary">🚀 Mulai Analisis</button>
+            </form>
+        </div>
+    </div>
+
 <?php
 // ==========================================
 // PROSES EKSTRAKSI
@@ -726,76 +1102,59 @@ if (isset($_POST['extract']) && !empty($_POST['domain'])) {
     $allUrls = [];
     $methodResults = [];
     
-    echo '<div class="result-section">';
-    echo '<h3>📊 Hasil Ekstraksi Multi-Method</h3>';
-    
     if (empty($selectedMethods)) {
+        echo '<div class="results-container">';
         echo '<div class="alert alert-danger">❌ Pilih minimal 1 metode ekstraksi!</div>';
-    } else {
-        echo '<div class="loading" id="loading">';
-        echo '<div class="spinner"></div>';
-        echo '<p>Sedang memproses, mohon tunggu...</p>';
         echo '</div>';
-        
-        echo '<div id="results">';
+    } else {
+        echo '<div class="results-container">';
+        echo '<div class="result-header">';
+        echo '<h2>📊 Hasil Analisis</h2>';
+        echo '<span class="result-status loading">⏳ Processing...</span>';
+        echo '</div>';
         
         // Method 1: Sitemap
         if (in_array('sitemap', $selectedMethods)) {
-            echo '<div class="alert alert-info">📂 [1/6] Mengekstrak dari Sitemap.xml...</div>';
+            echo '<div class="alert alert-info">📂 Mengekstrak dari Sitemap.xml...</div>';
             $sitemapUrls = extractFromSitemap($domain);
             $allUrls = array_merge($allUrls, $sitemapUrls);
             $methodResults['sitemap'] = count($sitemapUrls);
-            echo '<p style="color: #666; font-size: 13px; margin-bottom: 12px;">✓ Ditemukan <strong>' . count($sitemapUrls) . '</strong> URL dari sitemap</p>';
             flush();
         }
         
         // Method 2: Robots.txt
         if (in_array('robots', $selectedMethods)) {
-            echo '<div class="alert alert-info">🤖 [2/6] Scanning Robots.txt...</div>';
+            echo '<div class="alert alert-info">🤖 Scanning Robots.txt...</div>';
             $robotsUrls = extractFromRobotsTxt($domain);
             $allUrls = array_merge($allUrls, $robotsUrls);
             $methodResults['robots'] = count($robotsUrls);
-            echo '<p style="color: #666; font-size: 13px; margin-bottom: 12px;">✓ Ditemukan <strong>' . count($robotsUrls) . '</strong> paths dari robots.txt</p>';
             flush();
         }
         
         // Method 3: Page Links
         if (in_array('pagelinks', $selectedMethods)) {
-            echo '<div class="alert alert-info">🔗 [3/6] Extracting dari Page Links...</div>';
+            echo '<div class="alert alert-info">🔗 Extracting Page Links...</div>';
             $pageUrls = extractFromPageLinks($domain);
             $allUrls = array_merge($allUrls, $pageUrls);
             $methodResults['pagelinks'] = count($pageUrls);
-            echo '<p style="color: #666; font-size: 13px; margin-bottom: 12px;">✓ Ditemukan <strong>' . count($pageUrls) . '</strong> links dari halaman</p>';
             flush();
         }
         
         // Method 4: Web Crawling
         if (in_array('crawl', $selectedMethods)) {
-            echo '<div class="alert alert-info">🕷️ [4/6] Web Crawling (ini membutuhkan waktu)...</div>';
+            echo '<div class="alert alert-info">🕷️ Web Crawling (prosesnya membutuhkan waktu)...</div>';
             $crawlUrls = crawlWebsite($domain, $MAX_PAGES_CRAWL);
             $allUrls = array_merge($allUrls, $crawlUrls);
             $methodResults['crawl'] = count($crawlUrls);
-            echo '<p style="color: #666; font-size: 13px; margin-bottom: 12px;">✓ Ditemukan <strong>' . count($crawlUrls) . '</strong> URLs dari crawling</p>';
             flush();
         }
         
         // Method 5: Common Directories
         if (in_array('common', $selectedMethods)) {
-            echo '<div class="alert alert-info">📁 [5/6] Checking Common Directories...</div>';
+            echo '<div class="alert alert-info">📁 Checking Common Directories...</div>';
             $commonUrls = checkCommonDirectories($domain);
             $allUrls = array_merge($allUrls, $commonUrls);
             $methodResults['common'] = count($commonUrls);
-            echo '<p style="color: #666; font-size: 13px; margin-bottom: 12px;">✓ Ditemukan <strong>' . count($commonUrls) . '</strong> direktori umum yang aktif</p>';
-            flush();
-        }
-        
-        // Method 6: Google Cache
-        if (in_array('googlecache', $selectedMethods)) {
-            echo '<div class="alert alert-info">💾 [6/6] Querying Google Cache...</div>';
-            $cacheUrls = extractFromGoogleCache($domain);
-            $allUrls = array_merge($allUrls, $cacheUrls);
-            $methodResults['googlecache'] = count($cacheUrls);
-            echo '<p style="color: #666; font-size: 13px; margin-bottom: 12px;">✓ Ditemukan <strong>' . count($cacheUrls) . '</strong> URLs dari Google Cache</p>';
             flush();
         }
         
@@ -804,77 +1163,102 @@ if (isset($_POST['extract']) && !empty($_POST['domain'])) {
         $allUrls = array_filter($allUrls);
         sort($allUrls);
         
-        echo '</div>';
-        
         if (empty($allUrls)) {
-            echo '<div class="alert alert-warning">⚠️ Tidak ada URL yang ditemukan. Mungkin domain tidak dapat diakses atau tidak memiliki direktori publik.</div>';
+            echo '<div class="alert alert-warning">⚠️ Tidak ada URL yang ditemukan. Domain mungkin tidak dapat diakses.</div>';
         } else {
             // Extract directories
             $result = extractDirectories($allUrls, $domain);
             $directories = $result['directories'];
             $stats = $result['stats'];
             
-            // Tampilkan Summary Methods
-            echo '<h3 style="margin-top: 25px; color: #333; font-size: 16px;">📈 Ringkasan Metode Ekstraksi:</h3>';
-            echo '<div class="method-sources">';
+            // SUCCESS STATUS
+            echo '<script>document.querySelector(".result-status").className = "result-status"; document.querySelector(".result-status").innerHTML = "✅ Analisis Selesai";</script>';
+            echo '<div class="alert alert-success">✅ Sukses! Total <strong>' . count($allUrls) . '</strong> URLs ditemukan</div>';
+            
+            // STATS GRID
+            echo '<div class="stats-grid">';
+            echo '<div class="stat-card"><strong>' . count($allUrls) . '</strong><span>Total URLs</span></div>';
+            echo '<div class="stat-card"><strong>' . count($directories) . '</strong><span>Direktori Unik</span></div>';
+            echo '<div class="stat-card"><strong>' . $stats['max_depth'] . '</strong><span>Kedalaman Maksimal</span></div>';
+            echo '<div class="stat-card"><strong>' . count($selectedMethods) . '</strong><span>Methods Digunakan</span></div>';
+            echo '</div>';
+            
+            // METHODS SUMMARY
+            echo '<h3 style="margin: 30px 0 20px 0; color: var(--dark); font-size: 16px;">📈 Ringkasan Metode:</h3>';
+            echo '<div class="methods-grid">';
+            $methodLabels = [
+                'sitemap' => '📂 Sitemap',
+                'robots' => '🤖 Robots',
+                'pagelinks' => '🔗 Links',
+                'crawl' => '🕷️ Crawl',
+                'common' => '📁 Common'
+            ];
             foreach ($methodResults as $method => $count) {
-                $methodLabels = [
-                    'sitemap' => '📂 Sitemap',
-                    'robots' => '🤖 Robots.txt',
-                    'pagelinks' => '🔗 Page Links',
-                    'crawl' => '🕷️ Crawling',
-                    'common' => '📁 Common Dirs',
-                    'googlecache' => '💾 Google Cache'
-                ];
-                echo '<div class="source-item">';
+                echo '<div class="method-badge">';
                 echo '<strong>' . ($methodLabels[$method] ?? $method) . '</strong>';
-                echo '<span class="count">' . $count . ' URLs</span>';
+                echo '<div class="count">' . $count . '</div>';
+                echo '<span>URLs</span>';
                 echo '</div>';
             }
             echo '</div>';
             
-            // Tampilkan statistik
-            echo '<h3 style="margin-top: 25px; color: #333; font-size: 16px;">📊 Statistik Global:</h3>';
-            echo '<div class="stats-grid">';
-            echo '<div class="stat-box"><strong>' . $stats['total_urls'] . '</strong><span>Total URLs Ditemukan</span></div>';
-            echo '<div class="stat-box"><strong>' . $stats['unique_dirs'] . '</strong><span>Direktori Unik</span></div>';
-            echo '<div class="stat-box"><strong>' . $stats['max_depth'] . '</strong><span>Kedalaman Maksimal</span></div>';
-            echo '<div class="stat-box"><strong>' . count(array_unique(array_column($stats['categories'] ?? [], 'type'))) . '</strong><span>Kategori Ditemukan</span></div>';
+            // TABS & CONTENT
+            echo '<div style="margin-top: 30px;">';
+            echo '<div class="tabs">';
+            echo '<button class="tab-btn active" onclick="switchTab(\'directories\')">📋 Direktori (' . count($directories) . ')</button>';
+            echo '<button class="tab-btn" onclick="switchTab(\'urls\')">🔗 URLs Lengkap (' . count($allUrls) . ')</button>';
             echo '</div>';
             
-            echo '<div class="alert alert-success">✅ Sukses! Total <strong>' . count($allUrls) . '</strong> URLs ditemukan dari <strong>' . count(array_filter($methodResults)) . '</strong> metode</div>';
-            
-            // Direktori
-            echo '<h3 style="margin-top: 25px; color: #333; font-size: 16px;">📋 Daftar Direktori Unik:</h3>';
-            echo '<textarea readonly>';
+            // TAB: DIRECTORIES
+            echo '<div id="directories" class="tab-content active">';
+            echo '<div class="code-block">';
+            echo '<div class="code-block-header">';
+            echo '<span>Daftar Direktori Terindex</span>';
+            echo '<button class="copy-btn" onclick="copyToClipboard(\'directories-text\')">📋 Copy</button>';
+            echo '</div>';
+            echo '<div class="code-block-content">';
+            echo '<textarea id="directories-text" readonly>';
             foreach ($directories as $dir) {
                 echo $dir . "\n";
             }
             echo '</textarea>';
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
             
-            // URLs Lengkap
-            echo '<h3 style="margin-top: 25px; color: #333; font-size: 16px;">🔗 Daftar URL Lengkap:</h3>';
-            echo '<textarea readonly>';
+            // TAB: URLS
+            echo '<div id="urls" class="tab-content">';
+            echo '<div class="code-block">';
+            echo '<div class="code-block-header">';
+            echo '<span>Daftar URL Lengkap</span>';
+            echo '<button class="copy-btn" onclick="copyToClipboard(\'urls-text\')">📋 Copy</button>';
+            echo '</div>';
+            echo '<div class="code-block-content">';
+            echo '<textarea id="urls-text" readonly>';
             foreach ($allUrls as $url) {
                 echo $url . "\n";
             }
             echo '</textarea>';
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
             
-            // Tombol Export
-            echo '<div class="button-group" style="margin-top: 20px;">';
-            echo '<form method="POST" style="flex: 1;">';
+            // EXPORT BUTTONS
+            echo '<div class="button-group">';
+            echo '<form method="POST">';
             echo '<input type="hidden" name="export_dirs" value="' . base64_encode(json_encode($directories)) . '">';
-            echo '<button type="submit" style="margin: 0;">💾 Export Direktori</button>';
+            echo '<button type="submit" class="btn-export">💾 Export Direktori (.txt)</button>';
             echo '</form>';
-            echo '<form method="POST" style="flex: 1;">';
+            echo '<form method="POST">';
             echo '<input type="hidden" name="export_urls" value="' . base64_encode(json_encode($allUrls)) . '">';
-            echo '<button type="submit" style="margin: 0;">💾 Export URLs</button>';
+            echo '<button type="submit" class="btn-export">💾 Export URLs (.txt)</button>';
             echo '</form>';
             echo '</div>';
         }
+        
+        echo '</div>';
     }
-    
-    echo '</div>';
 }
 
 // ==========================================
@@ -883,7 +1267,7 @@ if (isset($_POST['extract']) && !empty($_POST['domain'])) {
 if (isset($_POST['export_dirs']) && !empty($_POST['export_dirs'])) {
     $directories = json_decode(base64_decode($_POST['export_dirs']), true);
     header('Content-Type: text/plain; charset=utf-8');
-    header('Content-Disposition: attachment; filename="google-indexed-directories-' . date('Y-m-d-His') . '.txt"');
+    header('Content-Disposition: attachment; filename="indexed-directories-' . date('Y-m-d-His') . '.txt"');
     echo implode("\n", $directories);
     exit;
 }
@@ -891,40 +1275,47 @@ if (isset($_POST['export_dirs']) && !empty($_POST['export_dirs'])) {
 if (isset($_POST['export_urls']) && !empty($_POST['export_urls'])) {
     $urls = json_decode(base64_decode($_POST['export_urls']), true);
     header('Content-Type: text/plain; charset=utf-8');
-    header('Content-Disposition: attachment; filename="google-indexed-urls-' . date('Y-m-d-His') . '.txt"');
+    header('Content-Disposition: attachment; filename="indexed-urls-' . date('Y-m-d-His') . '.txt"');
     echo implode("\n", $urls);
     exit;
 }
 ?>
-        
-        <div class="result-section" style="margin-top: 30px; background: #f0f7ff; border-left-color: #2196F3;">
-            <h3>ℹ️ Panduan Metode Ekstraksi</h3>
-            <div class="info-box" style="background: white; margin: 0;">
-                <strong style="color: #333; display: block; margin-bottom: 12px;">🎯 6 Metode Ekstraksi yang Digunakan:</strong>
-                <ol style="margin-left: 20px; color: #555; line-height: 1.8;">
-                    <li><strong>Sitemap.xml</strong> - Extract URL dari file sitemap (paling akurat, jika ada)</li>
-                    <li><strong>Robots.txt</strong> - Parse robots.txt untuk Disallow/Allow paths dan sitemap references</li>
-                    <li><strong>Page Links</strong> - Extract semua href links dari halaman utama domain</li>
-                    <li><strong>Web Crawling</strong> - Crawl website untuk menemukan URLs dengan mengikuti links</li>
-                    <li><strong>Common Directories</strong> - Check direktori umum (blog, shop, category, tag, dll)</li>
-                    <li><strong>Google Cache</strong> - Query Google Cache untuk menemukan URLs yang tercache</li>
-                </ol>
-            </div>
-        </div>
-        
-        <div style="margin-top: 30px; padding: 20px; background: #fff8e1; border-radius: 8px; border-left: 4px solid #ff9800;">
-            <strong style="color: #ff6f00; display: block; margin-bottom: 10px;">⚠️ Catatan Penting:</strong>
-            <ul style="list-style: none; color: #555; line-height: 1.8; font-size: 13px;">
-                <li>✓ Script ini 100% beroperasi TANPA perlu Sitemap</li>
-                <li>✓ Menggunakan multiple fallback methods untuk coverage maksimal</li>
-                <li>✓ Web crawling mungkin memakan waktu lebih lama jika website besar</li>
-                <li>✓ Hasil akurat tergantung accessibility domain dan struktur URL</li>
-                <li>✓ Untuk verifikasi 100% terindex, gunakan Google Search Console API</li>
-                <li>✓ Common directories scanning hanya untuk directories yang HTTP 200/301/302</li>
-            </ul>
-        </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <p>© 2024 Professional Google Indexed Extractor v3.0 | Premium UI Design</p>
     </div>
 </div>
+
+<script>
+    function switchTab(tabName) {
+        const tabs = document.querySelectorAll('.tab-content');
+        const buttons = document.querySelectorAll('.tab-btn');
+        
+        tabs.forEach(tab => {
+            tab.classList.remove('active');
+        });
+        buttons.forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        document.getElementById(tabName).classList.add('active');
+        event.target.classList.add('active');
+    }
+    
+    function copyToClipboard(elementId) {
+        const element = document.getElementById(elementId);
+        element.select();
+        document.execCommand('copy');
+        
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✓ Copied!';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+        }, 2000);
+    }
+</script>
 
 </body>
 </html>
